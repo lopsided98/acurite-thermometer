@@ -7,6 +7,7 @@ edition = "2021"
 [dependencies]
 panic-halt = "0.2.0"
 embedded-hal = "0.2.7"
+bitflags = "2.3.3"
 
 [dependencies.avr-device]
 version = "0.5.1"

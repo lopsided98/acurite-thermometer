@@ -8,6 +8,7 @@ version = "0.1.0"
 dependencies = [
  "atmega-hal",
  "avr-device",
+ "bitflags",
  "embedded-hal",
  "panic-halt",
 ]
@@ -65,6 +66,12 @@ name = "bare-metal"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8fe8f5a8a398345e52358e18ff07cc17a568fbca5c6f73873d3a62056309603"
+
+[[package]]
+name = "bitflags"
+version = "2.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "630be753d4e58660abd17930c71b647fe46c27ea6b63cc59e1e3851406972e42"
 
 [[package]]
 name = "cfg-if"
