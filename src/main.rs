@@ -1,6 +1,5 @@
 #![no_std]
 #![no_main]
-#![feature(let_else)]
 
 pub use atmega_hal as hal;
 use embedded_hal::blocking::delay::DelayMs;
@@ -10,7 +9,7 @@ use panic_halt as _;
 mod radio;
 mod tmp102;
 
-type Speed = hal::clock::MHz16;
+type Speed = hal::clock::MHz1;
 type Delay = hal::delay::Delay<Speed>;
 
 /// TMP102 config
@@ -53,9 +52,10 @@ const fn convert_temperature(temp_reg: i16) -> i16 {
 fn main() -> ! {
     let dp = hal::Peripherals::take().unwrap();
 
-    // // Set CPU clock to 1 MHz
-    // dp.CPU.clkpr.write(|w| w.clkpce().set_bit());
-    // dp.CPU.clkpr.write(|w| w.clkps().val_0x02());
+    // Set CPU clock to 1 MHz
+    let clkpr = &dp.CPU.clkpr;
+    clkpr.write(|w| w.clkpce().set_bit());
+    clkpr.write(|w| w.clkps().val_0x04());
 
     let pins = hal::pins!(dp);
 
@@ -65,18 +65,16 @@ fn main() -> ! {
         dp.USART0,
         pins.pd0,
         pins.pd1.into_output(),
-        115200.into_baudrate(),
+        9600.into_baudrate(),
     );
 
     let i2c_sda = pins.pc4;
     let i2c_scl = pins.pc5;
 
-    let i2c = hal::I2c::<Speed>::with_external_pullup(dp.TWI, i2c_sda, i2c_scl, 100000);
+    let i2c = hal::I2c::<Speed>::with_external_pullup(dp.TWI, i2c_sda, i2c_scl, 20000);
 
     let mut sensor = tmp102::Tmp102::new(i2c, Delay::new());
     let mut radio = radio::Radio::new(pins.pb1.into_output(), Delay::new());
-
-    ufmt::uwriteln!(&mut uart, "CLKPR: {}", dp.CPU.clkpr.read().bits()).void_unwrap();
 
     loop {
         led.toggle();
