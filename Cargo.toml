@@ -1,0 +1,31 @@
+[package]
+name = "acurite-thermometer"
+version = "0.1.0"
+authors = ["Ben Wolsieffer <benwolsieffer@gmail.com>"]
+edition = "2021"
+
+[dependencies]
+panic-halt = "0.2.0"
+embedded-hal = "0.2.7"
+
+[dependencies.avr-device]
+version = "0.5.1"
+features = ["atmega328p", "rt"]
+
+[dependencies.atmega-hal]
+git = "https://github.com/rahix/avr-hal"
+rev = "3c02df9df80e7585765644a87076680a2d99b29a"
+features = ["atmega328p"]
+
+# Configure the build for minimal size - AVRs have very little program memory
+[profile.dev]
+panic = "abort"
+lto = true
+opt-level = "s"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+debug = true
+lto = true
+opt-level = "s"
