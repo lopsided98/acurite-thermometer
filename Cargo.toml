@@ -5,9 +5,10 @@ authors = ["Ben Wolsieffer <benwolsieffer@gmail.com>"]
 edition = "2021"
 
 [dependencies]
-panic-halt = "0.2.0"
-embedded-hal = "0.2.7"
 bitflags = "2.3.3"
+embedded-hal = "0.2.7"
+panic-halt = "0.2.0"
+ufmt = "0.2.0"
 
 [dependencies.avr-device]
 version = "0.5.1"
@@ -17,6 +18,10 @@ features = ["atmega328p", "rt"]
 git = "https://github.com/rahix/avr-hal"
 rev = "3c02df9df80e7585765644a87076680a2d99b29a"
 features = ["atmega328p"]
+
+[dependencies.bitvec]
+version = "1.0.1"
+default-features = false
 
 # Configure the build for minimal size - AVRs have very little program memory
 [profile.dev]

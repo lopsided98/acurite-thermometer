@@ -1,74 +1,30 @@
 #![no_std]
 #![no_main]
+#![feature(let_else)]
 
-use atmega_hal as hal;
-use bitflags::bitflags;
-use embedded_hal::{
-    blocking::delay::DelayMs,
-    blocking::i2c::{Write, WriteRead},
-};
+pub use atmega_hal as hal;
+use embedded_hal::blocking::delay::DelayMs;
+use hal::{prelude::*, usart::BaudrateArduinoExt};
 use panic_halt as _;
+
+mod radio;
+mod tmp102;
 
 type Speed = hal::clock::MHz16;
 type Delay = hal::delay::Delay<Speed>;
-
-const TMP102_ADDR: u8 = 0x48;
-
-const TMP102_TEMPERATURE_REG: u8 = 0x0;
-const TMP102_CONFIG_REG: u8 = 0x1;
-
-bitflags! {
-    #[repr(transparent)]
-    struct Tmp102Config: u16 {
-        const OS = 1 << 15;
-        const R1 = 1 << 14;
-        const R2 = 1 << 13;
-        const F1 = 1 << 12;
-        const F2 = 1 << 11;
-        const POL = 1 << 10;
-        const TM = 1 << 9;
-        const SD = 1 << 8;
-        const CR1 = 1 << 7;
-        const CR0 = 1 << 6;
-        const AL = 1 << 5;
-        const EM = 1 << 4;
-    }
-}
-
-impl Tmp102Config {
-    const fn from_bytes(bytes: [u8; 2]) -> Self {
-        Self::from_bits_retain(u16::from_be_bytes(bytes))
-    }
-}
 
 /// TMP102 config
 /// - One-shot
 /// - Shutdown
 /// - Extended mode
-const TMP102_CONFIG: Tmp102Config = Tmp102Config::OS
-    .intersection(Tmp102Config::SD)
-    .intersection(Tmp102Config::EM);
-
-fn tmp102_reg_write<W: Write>(i2c: &mut W, reg: u8, value: u16) -> Result<(), W::Error> {
-    let value = value.to_be_bytes();
-    i2c.write(TMP102_ADDR, &[reg, value[0], value[1]])
-}
-
-#[inline]
-fn i2c_reg_read<W: WriteRead, const N: usize>(
-    i2c: &mut W,
-    address: u8,
-    reg: u8,
-) -> Result<[u8; N], W::Error> {
-    let mut value = [0u8; N];
-    i2c.write_read(address, &[reg], &mut value)?;
-    Ok(value)
-}
+const TMP102_CONFIG: tmp102::Config = tmp102::Config::OS
+    .union(tmp102::Config::SD)
+    .union(tmp102::Config::EM);
 
 const fn convert_temperature(temp_reg: i16) -> i16 {
-    let temp_whole = temp_reg / 256;
+    let temp_whole = temp_reg >> 7;
     // Binary fractional part, out of 16
-    let temp_frac_bin = ((temp_reg & 0xff) >> 4) as u8;
+    let temp_frac_bin = ((temp_reg & 0x7f) >> 3) as u8;
     // Convert to decimal fraction, with proper rounding
     let temp_frac = match temp_frac_bin {
         0 => 0,  // 0
@@ -96,38 +52,44 @@ const fn convert_temperature(temp_reg: i16) -> i16 {
 #[avr_device::entry]
 fn main() -> ! {
     let dp = hal::Peripherals::take().unwrap();
+
+    // // Set CPU clock to 1 MHz
+    // dp.CPU.clkpr.write(|w| w.clkpce().set_bit());
+    // dp.CPU.clkpr.write(|w| w.clkps().val_0x02());
+
     let pins = hal::pins!(dp);
 
     let mut led = pins.pb5.into_output();
 
+    let mut uart = hal::usart::Usart0::<Speed>::new(
+        dp.USART0,
+        pins.pd0,
+        pins.pd1.into_output(),
+        115200.into_baudrate(),
+    );
+
     let i2c_sda = pins.pc4;
     let i2c_scl = pins.pc5;
 
-    let mut i2c = hal::I2c::<Speed>::new(
-        dp.TWI,
-        i2c_sda.into_pull_up_input(),
-        i2c_scl.into_pull_up_input(),
-        50000,
-    );
+    let i2c = hal::I2c::<Speed>::with_external_pullup(dp.TWI, i2c_sda, i2c_scl, 100000);
+
+    let mut sensor = tmp102::Tmp102::new(i2c, Delay::new());
+    let mut radio = radio::Radio::new(pins.pb1.into_output(), Delay::new());
+
+    ufmt::uwriteln!(&mut uart, "CLKPR: {}", dp.CPU.clkpr.read().bits()).void_unwrap();
 
     loop {
-        tmp102_reg_write(&mut i2c, TMP102_CONFIG_REG, TMP102_CONFIG.bits()).unwrap();
-        // A single conversion typically takes 26 ms
-        Delay::new().delay_ms(30u16);
-        loop {
-            let config = Tmp102Config::from_bytes(i2c_reg_read(&mut i2c, TMP102_ADDR, TMP102_CONFIG_REG).unwrap());
-            if config.contains(Tmp102Config::OS) {
-                break;
-            }
-            Delay::new().delay_ms(2u16);
-        }
-
-        let temp_reg = i16::from_be_bytes(
-            i2c_reg_read(&mut i2c, TMP102_ADDR, TMP102_TEMPERATURE_REG).unwrap(),
-        );
+        led.toggle();
+        let Ok(temp_reg) = sensor.oneshot(TMP102_CONFIG) else {
+            ufmt::uwriteln!(&mut uart, "Failed to read temperature").void_unwrap();
+            continue;
+        };
         let temp = convert_temperature(temp_reg);
 
-        led.toggle();
-        Delay::new().delay_ms(temp as u16);
+        ufmt::uwriteln!(&mut uart, "Temp: {}, reg: {}", temp, temp_reg).void_unwrap();
+
+        radio.transmit(temp.to_be_bytes());
+
+        Delay::new().delay_ms(1000u16);
     }
 }
