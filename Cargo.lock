@@ -7,7 +7,9 @@ name = "acurite-thermometer"
 version = "0.1.0"
 dependencies = [
  "atmega-hal",
+ "attiny-hal",
  "avr-device",
+ "avr-hal-generic",
  "bitflags",
  "bitvec",
  "embedded-hal",
@@ -17,6 +19,15 @@ dependencies = [
 
 [[package]]
 name = "atmega-hal"
+version = "0.1.0"
+source = "git+https://github.com/rahix/avr-hal?rev=3c02df9df80e7585765644a87076680a2d99b29a#3c02df9df80e7585765644a87076680a2d99b29a"
+dependencies = [
+ "avr-device",
+ "avr-hal-generic",
+]
+
+[[package]]
+name = "attiny-hal"
 version = "0.1.0"
 source = "git+https://github.com/rahix/avr-hal?rev=3c02df9df80e7585765644a87076680a2d99b29a#3c02df9df80e7585765644a87076680a2d99b29a"
 dependencies = [

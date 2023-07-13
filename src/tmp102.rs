@@ -50,7 +50,7 @@ where
         Self { i2c, delay }
     }
 
-    fn read_register<const N: usize>(
+    fn register_read<const N: usize>(
         &mut self,
         reg: Register,
     ) -> Result<[u8; N], <I as WriteRead>::Error> {
@@ -59,7 +59,7 @@ where
         Ok(value)
     }
 
-    fn write_register<const N: usize>(
+    fn register_write<const N: usize>(
         &mut self,
         reg: Register,
         value: [u8; N],
@@ -69,18 +69,18 @@ where
 
     pub fn oneshot(&mut self, config: Config) -> Result<i16, E> {
         let config = config | Config::SD | Config::OS;
-        self.write_register(Register::Config, config.bits().to_be_bytes())?;
+        self.register_write(Register::Config, config.bits().to_be_bytes())?;
         // A single conversion typically takes 26 ms
         self.delay.delay_ms(30);
         loop {
-            let config = Config::from_bytes(self.read_register(Register::Config)?);
+            let config = Config::from_bytes(self.register_read(Register::Config)?);
             if config.contains(Config::OS) {
                 break;
             }
             self.delay.delay_ms(2);
         }
 
-        let temp_reg = i16::from_be_bytes(self.read_register(Register::Temperature)?);
+        let temp_reg = i16::from_be_bytes(self.register_read(Register::Temperature)?);
         Ok(temp_reg)
     }
 }
