@@ -12,6 +12,7 @@ use hal::usart::BaudrateArduinoExt;
 use hal::{port::Pin, prelude::*};
 use panic_halt as _;
 
+mod adc;
 mod power;
 mod radio;
 mod tmp102;
@@ -238,14 +239,18 @@ fn main() -> ! {
         }
         led.set_low();
 
+        // Watchdog wakes up after 8s, so sleep 4 times to get 32 second
+        // intervals.
         power::sleep_enable(&dp.CPU, power::SleepMode::PowerDown);
-        avr_device::asm::sleep();
+        for _ in 0..4 {
+            avr_device::asm::sleep();
+            // If WDE is set, WDIE is automatically cleared by hardware when a
+            // time-out occurs. This is useful for keeping the Watchdog Reset
+            // security while using the interrupt. After the WDIE bit is cleared,
+            // the next time-out will generate a reset. To avoid the Watchdog Reset,
+            // WDIE must be set after each interrupt.
+            watchdog.interrupt(true);
+        }
         power::sleep_disable(&dp.CPU);
-        // If WDE is set, WDIE is automatically cleared by hardware when a
-        // time-out occurs. This is useful for keeping the Watchdog Reset
-        // security while using the interrupt. After the WDIE bit is cleared,
-        // the next time-out will generate a reset. To avoid the Watchdog Reset,
-        // WDIE must be set after each interrupt.
-        watchdog.interrupt(true);
     }
 }
