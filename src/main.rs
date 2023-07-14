@@ -18,6 +18,12 @@ mod radio;
 mod tmp102;
 mod watchdog;
 
+#[cfg(feature = "atmega328p")]
+type Hal = hal::Atmega;
+
+#[cfg(feature = "attiny85")]
+type Hal = hal::Attiny;
+
 type Speed = hal::clock::MHz1;
 type Delay = hal::delay::Delay<Speed>;
 
@@ -59,8 +65,8 @@ avr_hal_generic::renamed_pins! {
     }
 }
 
-fn read_battery_mv(adc: &mut hal::adc::Adc<Speed>) -> u16 {
-    let value = adc.read_blocking(&hal::adc::channel::Vbg);
+fn read_battery_mv(adc: &mut adc::Adc, cpu: &hal::pac::CPU) -> u16 {
+    let value = adc.read_blocking_noise_reduction(hal::pac::adc::admux::MUX_A::ADC_VBG, cpu);
     ((1.1 * 1023.0 * 1000.0) as u32 / value as u32) as u16
 }
 
@@ -146,6 +152,9 @@ fn message(id: u8, battery_ok: bool, temperature: i16) -> [u8; 4] {
 }
 
 #[avr_device::interrupt(atmega328p)]
+fn ADC() {}
+
+#[avr_device::interrupt(atmega328p)]
 fn WDT() {}
 
 #[avr_device::entry]
@@ -154,16 +163,10 @@ fn main() -> ! {
 
     let dp = hal::Peripherals::take().unwrap();
 
-    // Set CPU clock to 1 MHz
-    avr_device::interrupt::free(|_| {
-        dp.CPU.clkpr.write(|w| w.clkpce().set_bit());
-        dp.CPU.clkpr.write(|w| w.clkps().val_0x04());
-    });
-
-    // Disable unused timers
-    dp.CPU
-        .prr
-        .write(|w| w.prtim0().set_bit().prtim1().set_bit());
+    // Set the CPU clock divider to match the configured speed
+    #[cfg(feature = "atmega328p")]
+    power::cpu_clock_divider::<hal::clock::MHz16, Speed>(&dp.CPU).unwrap();
+    power::disable_unused_hardware(&dp.CPU, &dp.AC);
 
     let mut watchdog = watchdog::Watchdog::new(dp.WDT, &dp.CPU.mcusr);
     watchdog.start(hal::wdt::Timeout::Ms8000).unwrap();
@@ -171,26 +174,26 @@ fn main() -> ! {
 
     let pins = Pins::with_mcu_pins(hal::pins!(dp));
 
-    let adc_settings_random = hal::adc::AdcSettings {
-        clock_divider: hal::adc::ClockDivider::Factor16,
-        ref_voltage: hal::adc::ReferenceVoltage::AVcc,
-    };
-
-    let adc_settings_battery = hal::adc::AdcSettings {
-        clock_divider: hal::adc::ClockDivider::Factor16,
-        #[cfg(feature = "atmega328p")]
-        ref_voltage: hal::adc::ReferenceVoltage::AVcc,
-    };
-
-    let mut adc = hal::adc::Adc::<Speed>::new(dp.ADC, adc_settings_random);
+    // Custom ADC driver that allows the use of noise reduction mode
+    let mut adc = adc::Adc::new(
+        dp.ADC,
+        hal::adc::AdcSettings {
+            clock_divider: hal::adc::ClockDivider::Factor16,
+            ref_voltage: hal::adc::ReferenceVoltage::AVcc,
+        },
+    );
+    // Enable ADC interrupt for power-reduction mode
+    adc.interrupt(true);
 
     // Random transmitter ID included in each message
     let id = {
-        let pin = pins.random.into_analog_input(&mut adc);
-        adc.read_blocking(&pin) as u8
+        #[cfg(feature = "atmega328p")]
+        let random_channel = hal::pac::adc::admux::MUX_A::ADC0;
+        adc.enable_pin(random_channel);
+        let id = adc.read_blocking(random_channel) as u8;
+        pins.random.into_pull_up_input();
+        id
     };
-
-    adc.initialize(adc_settings_battery);
 
     let mut led = pins.led.into_output();
 
@@ -207,6 +210,10 @@ fn main() -> ! {
     let mut sensor = tmp102::Tmp102::new(i2c, Delay::new());
     let mut radio = radio::Radio::new(pins.radio.into_output(), Delay::new());
 
+    // The first ADC read seems to be bad, so discard it. Its not the bandgap,
+    // since it still happens if you wait a long time.
+    read_battery_mv(&mut adc, &dp.CPU);
+
     #[cfg(feature = "atmega328p")]
     ufmt::uwriteln!(&mut uart, "Booted").void_unwrap();
 
@@ -218,7 +225,7 @@ fn main() -> ! {
         };
         let temp = convert_temperature(temp_reg);
 
-        let battery_mv = read_battery_mv(&mut adc);
+        let battery_mv = read_battery_mv(&mut adc, &dp.CPU);
 
         #[cfg(feature = "atmega328p")]
         ufmt::uwriteln!(
@@ -227,7 +234,7 @@ fn main() -> ! {
             id,
             temp,
             temp_reg,
-            read_battery_mv(&mut adc)
+            battery_mv
         )
         .void_unwrap();
 
@@ -239,10 +246,12 @@ fn main() -> ! {
         }
         led.set_low();
 
+        adc.enable(false);
+        power::sleep_enable(&dp.CPU, power::SleepMode::PowerDown);
         // Watchdog wakes up after 8s, so sleep 4 times to get 32 second
         // intervals.
-        power::sleep_enable(&dp.CPU, power::SleepMode::PowerDown);
         for _ in 0..4 {
+            power::disable_bod_in_sleep(&dp.CPU);
             avr_device::asm::sleep();
             // If WDE is set, WDIE is automatically cleared by hardware when a
             // time-out occurs. This is useful for keeping the Watchdog Reset
@@ -252,5 +261,6 @@ fn main() -> ! {
             watchdog.interrupt(true);
         }
         power::sleep_disable(&dp.CPU);
+        adc.enable(true);
     }
 }
