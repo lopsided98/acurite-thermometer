@@ -1,0 +1,9 @@
+[package]
+name = "acurite-protocol"
+version = "0.1.0"
+authors = ["Ben Wolsieffer <benwolsieffer@gmail.com>"]
+edition = "2021"
+
+[dependencies.bitvec]
+version = "1.0.1"
+default-features = false

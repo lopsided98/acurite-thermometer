@@ -3,9 +3,17 @@
 version = 3
 
 [[package]]
+name = "acurite-protocol"
+version = "0.1.0"
+dependencies = [
+ "bitvec",
+]
+
+[[package]]
 name = "acurite-thermometer"
 version = "0.1.0"
 dependencies = [
+ "acurite-protocol",
  "atmega-hal",
  "attiny-hal",
  "avr-device",

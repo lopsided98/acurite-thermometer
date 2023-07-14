@@ -1,0 +1,41 @@
+[package]
+name = "acurite-thermometer"
+version = "0.1.0"
+authors = ["Ben Wolsieffer <benwolsieffer@gmail.com>"]
+edition = "2021"
+
+[dependencies]
+bitflags = "2.3.3"
+embedded-hal = "0.2.7"
+panic-halt = "0.2.0"
+ufmt = "0.2.0"
+
+[dependencies.acurite-protocol]
+path = "../acurite-protocol"
+
+[dependencies.bitvec]
+version = "1.0.1"
+default-features = false
+
+[dependencies.avr-device]
+version = "0.5.1"
+features = ["rt"]
+
+[dependencies.atmega-hal]
+git = "https://github.com/rahix/avr-hal"
+rev = "3c02df9df80e7585765644a87076680a2d99b29a"
+optional = true
+
+[dependencies.attiny-hal]
+git = "https://github.com/rahix/avr-hal"
+rev = "3c02df9df80e7585765644a87076680a2d99b29a"
+optional = true
+
+[dependencies.avr-hal-generic]
+git = "https://github.com/rahix/avr-hal"
+rev = "3c02df9df80e7585765644a87076680a2d99b29a"
+
+[features]
+default = ["atmega328p"]
+atmega328p = ["atmega-hal/atmega328p"]
+attiny85 = ["attiny-hal/attiny85"]
