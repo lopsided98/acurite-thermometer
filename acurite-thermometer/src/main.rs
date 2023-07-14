@@ -87,7 +87,7 @@ fn main() -> ! {
     power::disable_unused_hardware(&dp.CPU, &dp.AC);
 
     let mut watchdog = watchdog::Watchdog::new(dp.WDT, &dp.CPU.mcusr);
-    watchdog.start(hal::wdt::Timeout::Ms8000).unwrap();
+    watchdog.start(hal::wdt::Timeout::Ms2000).unwrap();
     watchdog.interrupt(true);
 
     let pins = Pins::with_mcu_pins(hal::pins!(dp));
@@ -167,9 +167,8 @@ fn main() -> ! {
 
         adc.enable(false);
         power::sleep_enable(&dp.CPU, power::SleepMode::PowerDown);
-        // Watchdog wakes up after 8s, so sleep 4 times to get 32 second
-        // intervals.
-        for _ in 0..4 {
+        // 15x2=30 sec wakeups
+        for _ in 0..15 {
             power::disable_bod_in_sleep(&dp.CPU);
             avr_device::asm::sleep();
             // If WDE is set, WDIE is automatically cleared by hardware when a
