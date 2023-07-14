@@ -104,14 +104,15 @@ fn main() -> ! {
     adc.interrupt(true);
 
     // Random transmitter ID included in each message
-    let id = {
-        #[cfg(feature = "atmega328p")]
-        let random_channel = hal::pac::adc::admux::MUX_A::ADC0;
-        adc.enable_pin(random_channel);
-        let id = adc.read_blocking(random_channel) as u8;
-        pins.random.into_pull_up_input();
-        id
-    };
+    // let id = {
+    //     #[cfg(feature = "atmega328p")]
+    //     let random_channel = hal::pac::adc::admux::MUX_A::ADC0;
+    //     adc.enable_pin(random_channel);
+    //     let id = adc.read_blocking(random_channel) as u8;
+    //     pins.random.into_pull_up_input();
+    //     id
+    // };
+    let id = 0x65;
 
     let mut led = pins.led.into_output();
 
@@ -141,7 +142,7 @@ fn main() -> ! {
             ufmt::uwriteln!(&mut uart, "Failed to read temperature").void_unwrap();
             continue;
         };
-        let temp = convert_temperature(temp_reg);
+        let temp = acurite_protocol::tx0606::convert_temperature(temp_reg);
 
         let battery_mv = read_battery_mv(&mut adc, &dp.CPU);
 
