@@ -1,4 +1,4 @@
-use avr_hal_generic::wdt::WdtOps;
+use hal::wdt::WdtOps;
 
 use super::hal;
 
