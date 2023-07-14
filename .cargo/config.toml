@@ -1,7 +1,7 @@
 [build]
 target = "avr-specs/avr-atmega328p.json"
 
-[target.'cfg(target_arch = "avr")']
+[target.avr-atmega328p]
 runner = "ravedude uno -cb 9600"
 
 [unstable]

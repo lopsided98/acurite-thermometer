@@ -6,7 +6,6 @@
 pub use atmega_hal as hal;
 #[cfg(feature = "attiny85")]
 pub use attiny_hal as hal;
-use bitvec::view::BitView;
 #[cfg(feature = "atmega328p")]
 use hal::usart::BaudrateArduinoExt;
 use hal::{port::Pin, prelude::*};
@@ -68,87 +67,6 @@ avr_hal_generic::renamed_pins! {
 fn read_battery_mv(adc: &mut adc::Adc, cpu: &hal::pac::CPU) -> u16 {
     let value = adc.read_blocking_noise_reduction(hal::pac::adc::admux::MUX_A::ADC_VBG, cpu);
     ((1.1 * 1023.0 * 1000.0) as u32 / value as u32) as u16
-}
-
-const fn convert_temperature(temp_reg: i16) -> i16 {
-    let temp_whole = temp_reg >> 7;
-    // Binary fractional part, out of 16
-    let temp_frac_bin = ((temp_reg & 0x7f) >> 3) as u8;
-    // Convert to decimal fraction, with proper rounding
-    let temp_frac = match temp_frac_bin {
-        0 => 0,  // 0
-        1 => 1,  // 0.0625
-        2 => 1,  // 0.125
-        3 => 2,  // 0.1875
-        4 => 3,  // 0.25
-        5 => 3,  // 0.3125
-        6 => 4,  // 0.375
-        7 => 4,  // 0.4375
-        8 => 5,  // 0.5
-        9 => 6,  // 0.5625
-        10 => 6, // 0.625
-        11 => 7, // 0.6875
-        12 => 8, // 0.75
-        13 => 8, // 0.8125
-        14 => 9, // 0.875
-        15 => 9, // 0.9375
-        _ => unreachable!(),
-    };
-
-    temp_whole * 10 + temp_frac as i16
-}
-
-const fn lfsr_sequence<const N: usize>() -> [u8; N] {
-    let mut reg: u8 = 0x7C;
-    let mut temp_reg: u8;
-    let mut sequence = [0u8; N];
-
-    let mut i: usize = 0;
-    loop {
-        if i >= N {
-            break;
-        }
-        temp_reg = reg & 0x01;
-        reg >>= 1;
-        reg |= temp_reg << 7;
-
-        if temp_reg != 0 {
-            reg ^= 0x18
-        }
-        sequence[i] = reg;
-        i += 1;
-    }
-    sequence
-}
-
-fn lfsr_hash<const N: usize, const M: usize, const OFFSET: usize>(data: &[u8; N]) -> u8 {
-    let sequence = lfsr_sequence::<M>();
-
-    let mut hash_reg: u8 = 0;
-    for (byte_idx, byte) in data.iter().enumerate() {
-        for (bit_idx, bit) in byte
-            .view_bits::<bitvec::order::Msb0>()
-            .into_iter()
-            .enumerate()
-        {
-            if *bit {
-                hash_reg ^= sequence[byte_idx * 8 + bit_idx + OFFSET]
-            }
-        }
-    }
-
-    hash_reg
-}
-
-fn message(id: u8, battery_ok: bool, temperature: i16) -> [u8; 4] {
-    let status = if battery_ok { 0b1000 } else { 0b0000 };
-    let body: [u8; 3] = [
-        id,
-        status << 4 | (temperature & 0xf00 >> 8) as u8,
-        (temperature & 0xff) as u8,
-    ];
-    let hash = lfsr_hash::<3, 32, 4>(&body);
-    [body[0], body[1], body[2], hash]
 }
 
 #[avr_device::interrupt(atmega328p)]
@@ -238,7 +156,7 @@ fn main() -> ! {
         )
         .void_unwrap();
 
-        let message = message(id, battery_mv > BATTERY_LOW_MV, temp);
+        let message = acurite_protocol::tx0606::generate(id, battery_mv > BATTERY_LOW_MV, temp);
 
         led.set_high();
         for _ in 0..7 {

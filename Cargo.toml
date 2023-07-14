@@ -17,3 +17,9 @@ codegen-units = 1
 debug = true
 lto = true
 opt-level = "s"
+
+# Undo optimization settings for tests that run on the build platform
+[profile.test]
+panic = "unwind"
+lto = false
+opt-level = 0
