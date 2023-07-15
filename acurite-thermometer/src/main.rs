@@ -42,7 +42,7 @@ avr_hal_generic::renamed_pins! {
 
     pub struct Pins from atmega_hal::Pins {
         pub led: atmega_hal::port::PB5 = pb5,
-        pub random: atmega_hal::port::PC0 = pc0,
+        pub random: atmega_hal::port::PC3 = pc3,
         pub uart_rx: atmega_hal::port::PD0 = pd0,
         pub uart_tx: atmega_hal::port::PD1 = pd1,
         pub i2c_sda: atmega_hal::port::PC4 = pc4,
@@ -62,6 +62,16 @@ avr_hal_generic::renamed_pins! {
         pub i2c_scl: attiny_hal::port::PB2 = pb2,
         pub radio: attiny_hal::port::PB4 = pb4,
     }
+}
+
+fn random_u8(adc: &mut adc::Adc, channel: hal::pac::adc::admux::MUX_A) -> u8 {
+    adc.enable_pin(channel);
+    let mut value = 0;
+    for _ in 0..8 {
+        value <<= 1;
+        value |= (adc.read_blocking(channel) as u8) & 0x1;
+    }
+    value
 }
 
 fn read_battery_mv(adc: &mut adc::Adc, cpu: &hal::pac::CPU) -> u16 {
@@ -104,15 +114,8 @@ fn main() -> ! {
     adc.interrupt(true);
 
     // Random transmitter ID included in each message
-    // let id = {
-    //     #[cfg(feature = "atmega328p")]
-    //     let random_channel = hal::pac::adc::admux::MUX_A::ADC0;
-    //     adc.enable_pin(random_channel);
-    //     let id = adc.read_blocking(random_channel) as u8;
-    //     pins.random.into_pull_up_input();
-    //     id
-    // };
-    let id = 0x65;
+    let id = random_u8(&mut adc, hal::pac::adc::admux::MUX_A::ADC3);
+    pins.random.into_pull_up_input();
 
     let mut led = pins.led.into_output();
 
@@ -137,11 +140,13 @@ fn main() -> ! {
     ufmt::uwriteln!(&mut uart, "Booted").void_unwrap();
 
     loop {
+        led.set_high();
         let Ok(temp_reg) = sensor.oneshot(TMP102_CONFIG) else {
             #[cfg(feature = "atmega328p")]
             ufmt::uwriteln!(&mut uart, "Failed to read temperature").void_unwrap();
             continue;
         };
+        led.set_low();
         let temp = acurite_protocol::tx0606::convert_temperature(temp_reg);
 
         let battery_mv = read_battery_mv(&mut adc, &dp.CPU);
@@ -159,11 +164,9 @@ fn main() -> ! {
 
         let message = acurite_protocol::tx0606::generate(id, battery_mv > BATTERY_LOW_MV, temp);
 
-        led.set_high();
         for _ in 0..7 {
             radio.transmit(message);
         }
-        led.set_low();
 
         adc.enable(false);
         power::sleep_enable(&dp.CPU, power::SleepMode::PowerDown);
