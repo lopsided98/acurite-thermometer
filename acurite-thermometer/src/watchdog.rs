@@ -17,6 +17,11 @@ impl Watchdog {
     }
 
     pub fn interrupt(&mut self, enable: bool) {
-        self.wdt.wdtcsr.modify(|_, w| w.wdie().bit(enable));
+        #[cfg(feature = "atmega328p")]
+        let reg = &self.wdt.wdtcsr;
+        #[cfg(feature = "attiny85")]
+        let reg = &self.wdt.wdtcr;
+        reg.modify(|_, w| w.wdie().bit(enable));
+        reg.modify(|_, w| w.wdie().bit(enable));
     }
 }

@@ -12,6 +12,8 @@ use hal::{port::Pin, prelude::*};
 use panic_halt as _;
 
 mod adc;
+#[cfg(feature = "attiny85")]
+mod i2c;
 mod power;
 mod radio;
 mod tmp102;
@@ -25,6 +27,11 @@ type Hal = hal::Attiny;
 
 type Speed = hal::clock::MHz1;
 type Delay = hal::delay::Delay<Speed>;
+
+#[cfg(feature = "atmega328p")]
+type I2c = hal::i2c::I2c<Speed>;
+#[cfg(feature = "attiny85")]
+type I2c = i2c::I2c<hal::port::PB0, hal::port::PB2, Speed>;
 
 /// TMP102 config
 /// - One-shot
@@ -40,14 +47,14 @@ const BATTERY_LOW_MV: u16 = 2000;
 avr_hal_generic::renamed_pins! {
     type Pin = Pin;
 
-    pub struct Pins from atmega_hal::Pins {
-        pub led: atmega_hal::port::PB5 = pb5,
-        pub random: atmega_hal::port::PC3 = pc3,
-        pub uart_rx: atmega_hal::port::PD0 = pd0,
-        pub uart_tx: atmega_hal::port::PD1 = pd1,
-        pub i2c_sda: atmega_hal::port::PC4 = pc4,
-        pub i2c_scl: atmega_hal::port::PC5 = pc5,
-        pub radio: atmega_hal::port::PB1 = pb1,
+    pub struct Pins from hal::Pins {
+        pub led: hal::port::PB5 = pb5,
+        pub random: hal::port::PC3 = pc3,
+        pub uart_rx: hal::port::PD0 = pd0,
+        pub uart_tx: hal::port::PD1 = pd1,
+        pub i2c_sda: hal::port::PC4 = pc4,
+        pub i2c_scl: hal::port::PC5 = pc5,
+        pub radio: hal::port::PB1 = pb1,
     }
 }
 
@@ -55,12 +62,12 @@ avr_hal_generic::renamed_pins! {
 avr_hal_generic::renamed_pins! {
     type Pin = Pin;
 
-    pub struct Pins from attiny_hal::Pins {
-        pub led: attiny_hal::port::PB5 = pb5,
-        pub random: attiny_hal::port::PB3 = pb3,
-        pub i2c_sda: attiny_hal::port::PB0 = pb0,
-        pub i2c_scl: attiny_hal::port::PB2 = pb2,
-        pub radio: attiny_hal::port::PB4 = pb4,
+    pub struct Pins from hal::Pins {
+        pub led: hal::port::PB5 = pb5,
+        pub random: hal::port::PB3 = pb3,
+        pub i2c_sda: hal::port::PB0 = pb0,
+        pub i2c_scl: hal::port::PB2 = pb2,
+        pub radio: hal::port::PB4 = pb4,
     }
 }
 
@@ -127,7 +134,11 @@ fn main() -> ! {
         9600.into_baudrate(),
     );
 
-    let i2c = hal::I2c::<Speed>::with_external_pullup(dp.TWI, pins.i2c_sda, pins.i2c_scl, 20000);
+    #[cfg(feature = "atmega328p")]
+    let i2c_peripheral = dp.TWI;
+    #[cfg(feature = "attiny85")]
+    let i2c_peripheral = dp.USI;
+    let i2c = I2c::with_external_pullup(i2c_peripheral, pins.i2c_sda, pins.i2c_scl, 20000);
 
     let mut sensor = tmp102::Tmp102::new(i2c, Delay::new());
     let mut radio = radio::Radio::new(pins.radio.into_output(), Delay::new());
@@ -141,31 +152,39 @@ fn main() -> ! {
 
     loop {
         led.set_high();
-        let Ok(temp_reg) = sensor.oneshot(TMP102_CONFIG) else {
+        if let Ok(temp_reg) = sensor.oneshot(TMP102_CONFIG) {
+            led.set_low();
+
+            let temp = acurite_protocol::tx0606::convert_temperature(temp_reg);
+
+            let battery_mv = read_battery_mv(&mut adc, &dp.CPU);
+
             #[cfg(feature = "atmega328p")]
-            ufmt::uwriteln!(&mut uart, "Failed to read temperature").void_unwrap();
-            continue;
-        };
-        led.set_low();
-        let temp = acurite_protocol::tx0606::convert_temperature(temp_reg);
+            ufmt::uwriteln!(
+                &mut uart,
+                "id: {}, temp: {}, temp reg: {}, batt: {}",
+                id,
+                temp,
+                temp_reg,
+                battery_mv
+            )
+            .void_unwrap();
 
-        let battery_mv = read_battery_mv(&mut adc, &dp.CPU);
+            let message = acurite_protocol::tx0606::generate(id, battery_mv > BATTERY_LOW_MV, temp);
 
-        #[cfg(feature = "atmega328p")]
-        ufmt::uwriteln!(
-            &mut uart,
-            "id: {}, temp: {}, reg: {}, batt: {}",
-            id,
-            temp,
-            temp_reg,
-            battery_mv
-        )
-        .void_unwrap();
-
-        let message = acurite_protocol::tx0606::generate(id, battery_mv > BATTERY_LOW_MV, temp);
-
-        for _ in 0..7 {
-            radio.transmit(message);
+            for _ in 0..7 {
+                radio.transmit(message);
+            }
+        } else {
+            #[cfg(feature = "atmega328p")]
+            ufmt::uwriteln!(&mut uart, "error: failed to read temperature").void_unwrap();
+            led.set_low();
+            for _ in 0..4 {
+                Delay::new().delay_ms(100u8);
+                led.set_high();
+                Delay::new().delay_ms(100u8);
+                led.set_low();
+            }
         }
 
         adc.enable(false);

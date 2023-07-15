@@ -17,6 +17,6 @@ panic-halt = "0.2.0"
 ufmt = "0.2.0"
 
 [features]
-default = ["atmega328p"]
+default = ["attiny85"]
 atmega328p = ["atmega-hal/atmega328p"]
 attiny85 = ["attiny-hal/attiny85"]
