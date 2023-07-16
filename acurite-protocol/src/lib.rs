@@ -1,7 +1,5 @@
 #![no_std]
 
-use bitvec::view::BitView;
-
 #[cfg(test)]
 mod test;
 
@@ -29,14 +27,13 @@ fn lfsr_hash<const N: usize, const M: usize, const OFFSET: usize>(data: &[u8; N]
 
     let mut hash_reg: u8 = 0;
     for (byte_idx, byte) in data.iter().enumerate() {
-        for (bit_idx, bit) in byte
-            .view_bits::<bitvec::order::Msb0>()
-            .into_iter()
-            .enumerate()
-        {
-            if *bit {
+        let mut byte = *byte;
+        for bit_idx in 0..8 {
+            let bit = byte & 0x80 != 0;
+            if bit {
                 hash_reg ^= sequence[byte_idx * 8 + bit_idx + OFFSET]
             }
+            byte <<= 1;
         }
     }
 

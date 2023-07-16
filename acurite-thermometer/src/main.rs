@@ -63,7 +63,7 @@ avr_hal_generic::renamed_pins! {
     type Pin = Pin;
 
     pub struct Pins from hal::Pins {
-        pub led: hal::port::PB5 = pb5,
+        pub led: hal::port::PB1 = pb1,
         pub random: hal::port::PB3 = pb3,
         pub i2c_sda: hal::port::PB0 = pb0,
         pub i2c_scl: hal::port::PB2 = pb2,
@@ -86,17 +86,30 @@ fn read_battery_mv(adc: &mut adc::Adc, cpu: &hal::pac::CPU) -> u16 {
     ((1.1 * 1023.0 * 1000.0) as u32 / value as u32) as u16
 }
 
+#[cfg(feature = "attiny85")]
+#[avr_device::interrupt(attiny85)]
+fn ADC() {}
+
+#[cfg(feature = "atmega328p")]
 #[avr_device::interrupt(atmega328p)]
 fn ADC() {}
 
+#[cfg(feature = "attiny85")]
+#[avr_device::interrupt(attiny85)]
+fn WDT() {}
+
+#[cfg(feature = "atmega328p")]
 #[avr_device::interrupt(atmega328p)]
 fn WDT() {}
 
-#[avr_device::entry]
+#[hal::entry]
 fn main() -> ! {
     unsafe { avr_device::interrupt::enable() };
 
     let dp = hal::Peripherals::take().unwrap();
+    let pins = Pins::with_mcu_pins(hal::pins!(dp));
+
+    let mut led = pins.led.into_output();
 
     // Set the CPU clock divider to match the configured speed
     #[cfg(feature = "atmega328p")]
@@ -106,8 +119,6 @@ fn main() -> ! {
     let mut watchdog = watchdog::Watchdog::new(dp.WDT, &dp.CPU.mcusr);
     watchdog.start(hal::wdt::Timeout::Ms2000).unwrap();
     watchdog.interrupt(true);
-
-    let pins = Pins::with_mcu_pins(hal::pins!(dp));
 
     // Custom ADC driver that allows the use of noise reduction mode
     let mut adc = adc::Adc::new(
@@ -123,8 +134,6 @@ fn main() -> ! {
     // Random transmitter ID included in each message
     let id = random_u8(&mut adc, hal::pac::adc::admux::MUX_A::ADC3);
     pins.random.into_pull_up_input();
-
-    let mut led = pins.led.into_output();
 
     #[cfg(feature = "atmega328p")]
     let mut uart = hal::usart::Usart0::<Speed>::new(

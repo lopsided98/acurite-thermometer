@@ -5,6 +5,13 @@ members = [
     "acurite-thermometer",
 ]
 
+[patch.crates-io]
+#avr-device = { path = "../avr-device" }
+
+[patch."https://github.com/rahix/avr-hal"]
+attiny-hal = { path = "../avr-hal/mcu/attiny-hal" }
+avr-hal-generic = { path = "../avr-hal/avr-hal-generic" }
+
 # Configure the build for minimal size - AVRs have very little program memory
 [profile.dev]
 panic = "abort"

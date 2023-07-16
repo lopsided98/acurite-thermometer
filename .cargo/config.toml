@@ -1,5 +1,5 @@
 [build]
-target = "avr-specs/avr-atmega328p.json"
+target = "avr-specs/avr-attiny85.json"
 
 [target.avr-atmega328p]
 runner = "ravedude uno -cb 9600"

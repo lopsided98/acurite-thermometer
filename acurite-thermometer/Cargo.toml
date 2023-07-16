@@ -6,12 +6,11 @@ edition = "2021"
 
 [dependencies]
 acurite-protocol = { path = "../acurite-protocol" }
-atmega-hal = { git = "https://github.com/rahix/avr-hal", rev = "3c02df9df80e7585765644a87076680a2d99b29a", optional = true }
-attiny-hal = { git = "https://github.com/rahix/avr-hal", rev = "3c02df9df80e7585765644a87076680a2d99b29a", optional = true }
+atmega-hal = { git = "https://github.com/rahix/avr-hal", rev = "3c02df9df80e7585765644a87076680a2d99b29a", features = ["rt"], optional = true }
+attiny-hal = { git = "https://github.com/rahix/avr-hal", rev = "3c02df9df80e7585765644a87076680a2d99b29a", features = ["rt"], optional = true }
 avr-device = { version = "0.5.1", features = ["rt"] }
 avr-hal-generic = { git = "https://github.com/rahix/avr-hal", rev = "3c02df9df80e7585765644a87076680a2d99b29a" }
 bitflags = "2.3.3"
-bitvec = { version = "1.0.1", default-features = false }
 embedded-hal = "0.2.7"
 panic-halt = "0.2.0"
 ufmt = "0.2.0"

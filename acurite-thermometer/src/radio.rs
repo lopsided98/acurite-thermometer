@@ -1,5 +1,3 @@
-use bitvec::{array::BitArray, order::Msb0};
-
 use super::hal;
 
 pub struct Radio<P, D> {
@@ -40,13 +38,17 @@ where
     }
 
     pub fn transmit<const N: usize>(&mut self, data: [u8; N]) {
-        let data = BitArray::<_, Msb0>::new(data);
         self.start();
-        for b in data {
-            if b {
-                self.one();
-            } else {
-                self.zero();
+        for byte in data.iter() {
+            let mut byte = *byte;
+            for _ in 0..8 {
+                let bit = byte & 0x80 != 0;
+                if bit {
+                    self.one();
+                } else {
+                    self.zero();
+                }
+                byte <<= 1;
             }
         }
         self.stop();
