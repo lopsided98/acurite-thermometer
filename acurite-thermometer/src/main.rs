@@ -117,7 +117,7 @@ fn main() -> ! {
     power::disable_unused_hardware(&dp.CPU, &dp.AC);
 
     let mut watchdog = watchdog::Watchdog::new(dp.WDT, &dp.CPU.mcusr);
-    watchdog.start(hal::wdt::Timeout::Ms2000).unwrap();
+    watchdog.start(hal::wdt::Timeout::Ms1000).unwrap();
     watchdog.interrupt(true);
 
     // Custom ADC driver that allows the use of noise reduction mode
@@ -155,14 +155,18 @@ fn main() -> ! {
     // The first ADC read seems to be bad, so discard it. Its not the bandgap,
     // since it still happens if you wait a long time.
     read_battery_mv(&mut adc, &dp.CPU);
+    // First TMP102 reading also seems to be bad? Only happens on the real
+    // board.
+    sensor.oneshot(TMP102_CONFIG).ok();
 
     #[cfg(feature = "atmega328p")]
     ufmt::uwriteln!(&mut uart, "Booted").void_unwrap();
 
     loop {
-        led.set_high();
+        // Active low
+        led.set_low();
         if let Ok(temp_reg) = sensor.oneshot(TMP102_CONFIG) {
-            led.set_low();
+            led.set_high();
 
             let temp = acurite_protocol::tx0606::convert_temperature(temp_reg);
 
@@ -187,19 +191,19 @@ fn main() -> ! {
         } else {
             #[cfg(feature = "atmega328p")]
             ufmt::uwriteln!(&mut uart, "error: failed to read temperature").void_unwrap();
-            led.set_low();
+            led.set_high();
             for _ in 0..4 {
                 Delay::new().delay_ms(100u8);
-                led.set_high();
-                Delay::new().delay_ms(100u8);
                 led.set_low();
+                Delay::new().delay_ms(100u8);
+                led.set_high();
             }
         }
 
         adc.enable(false);
         power::sleep_enable(&dp.CPU, power::SleepMode::PowerDown);
-        // 15x2=30 sec wakeups
-        for _ in 0..15 {
+        // 31x1sec wakeups
+        for _ in 0..31 {
             power::disable_bod_in_sleep(&dp.CPU);
             avr_device::asm::sleep();
             // If WDE is set, WDIE is automatically cleared by hardware when a
