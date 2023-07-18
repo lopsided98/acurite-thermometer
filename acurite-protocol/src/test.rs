@@ -26,26 +26,26 @@ fn test_lfsr_hash() {
 
 #[test]
 fn test_0606tx_convert_temperature() {
-    assert_eq!(1500, tx0606::convert_temperature(0x0960 << 3)); // 150
-    assert_eq!(1280, tx0606::convert_temperature(0x0800 << 3)); // 128
-    assert_eq!(1279, tx0606::convert_temperature(0x07ff << 3)); // 127.9375
-    assert_eq!(3, tx0606::convert_temperature(0x0004 << 3)); // 0.25
-    assert_eq!(-3, tx0606::convert_temperature(0x1ffc << 3)); // -0.25
-    assert_eq!(-8, tx0606::convert_temperature(0x1ff4 << 3)); // -0.75
-    assert_eq!(-254, tx0606::convert_temperature(0x1e6a << 3)); // -25.375
-    assert_eq!(-455, tx0606::convert_temperature(0x1d28 << 3)); // -45.5
-    assert_eq!(-456, tx0606::convert_temperature(0x1d26 << 3)); // -45.625
-    assert_eq!(-458, tx0606::convert_temperature(0x1d24 << 3)); // -45.75
+    assert_eq!(1500, tx00606::convert_temperature(0x0960 << 3)); // 150
+    assert_eq!(1280, tx00606::convert_temperature(0x0800 << 3)); // 128
+    assert_eq!(1279, tx00606::convert_temperature(0x07ff << 3)); // 127.9375
+    assert_eq!(3, tx00606::convert_temperature(0x0004 << 3)); // 0.25
+    assert_eq!(-3, tx00606::convert_temperature(0x1ffc << 3)); // -0.25
+    assert_eq!(-8, tx00606::convert_temperature(0x1ff4 << 3)); // -0.75
+    assert_eq!(-254, tx00606::convert_temperature(0x1e6a << 3)); // -25.375
+    assert_eq!(-455, tx00606::convert_temperature(0x1d28 << 3)); // -45.5
+    assert_eq!(-456, tx00606::convert_temperature(0x1d26 << 3)); // -45.625
+    assert_eq!(-458, tx00606::convert_temperature(0x1d24 << 3)); // -45.75
 }
 
 #[test]
 fn test_0606tx_message() {
-    let message = tx0606::generate(0xe6, true, 310);
+    let message = tx00606::generate(0xe6, true, 310);
     assert_eq!([0xe6, 0x81, 0x36, 0x13], message);
 }
 
 #[test]
 fn test_0606tx_message_low_battery() {
-    let message = tx0606::generate(0xe6, false, 310);
+    let message = tx00606::generate(0xe6, false, 310);
     assert_eq!([0xe6, 0x01, 0x36, 0xC6], message);
 }

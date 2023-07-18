@@ -41,7 +41,7 @@ fn lfsr_hash<const N: usize, const M: usize, const OFFSET: usize>(data: &[u8; N]
 }
 
 /// Support for the Acurite 00606TX temperature sensor.
-pub mod tx0606 {
+pub mod tx00606 {
 
     /// Convert a left justified, 9.4 fixed point temperature to the decimal format used by the 0606TX. This is the format used by sensors such as the TMP102.
     pub const fn convert_temperature(temp_reg: i16) -> i16 {

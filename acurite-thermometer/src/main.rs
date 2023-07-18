@@ -168,7 +168,7 @@ fn main() -> ! {
         if let Ok(temp_reg) = sensor.oneshot(TMP102_CONFIG) {
             led.set_high();
 
-            let temp = acurite_protocol::tx0606::convert_temperature(temp_reg);
+            let temp = acurite_protocol::tx00606::convert_temperature(temp_reg);
 
             let battery_mv = read_battery_mv(&mut adc, &dp.CPU);
 
@@ -183,7 +183,7 @@ fn main() -> ! {
             )
             .void_unwrap();
 
-            let message = acurite_protocol::tx0606::generate(id, battery_mv > BATTERY_LOW_MV, temp);
+            let message = acurite_protocol::tx00606::generate(id, battery_mv > BATTERY_LOW_MV, temp);
 
             for _ in 0..7 {
                 radio.transmit(message);
