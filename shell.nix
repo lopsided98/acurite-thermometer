@@ -6,7 +6,6 @@ in mkShell {
   nativeBuildInputs = [
     rust
     pkgsCross.avr.buildPackages.gcc
-    pkgsCross.avr.buildPackages.gdb
     avrdude
     udev
     # Stable mode is basically useless
