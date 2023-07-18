@@ -24,7 +24,7 @@ dependencies = [
 [[package]]
 name = "atmega-hal"
 version = "0.1.0"
-source = "git+https://github.com/rahix/avr-hal?rev=3c02df9df80e7585765644a87076680a2d99b29a#3c02df9df80e7585765644a87076680a2d99b29a"
+source = "git+https://github.com/lopsided98/avr-hal?rev=c55950860038011b83937a8a0729ba89412ab026#c55950860038011b83937a8a0729ba89412ab026"
 dependencies = [
  "avr-device",
  "avr-hal-generic",
@@ -33,6 +33,7 @@ dependencies = [
 [[package]]
 name = "attiny-hal"
 version = "0.1.0"
+source = "git+https://github.com/lopsided98/avr-hal?rev=c55950860038011b83937a8a0729ba89412ab026#c55950860038011b83937a8a0729ba89412ab026"
 dependencies = [
  "avr-device",
  "avr-hal-generic",
@@ -64,6 +65,7 @@ dependencies = [
 [[package]]
 name = "avr-hal-generic"
 version = "0.1.0"
+source = "git+https://github.com/lopsided98/avr-hal?rev=c55950860038011b83937a8a0729ba89412ab026#c55950860038011b83937a8a0729ba89412ab026"
 dependencies = [
  "avr-device",
  "cfg-if 0.1.10",
