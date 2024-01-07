@@ -183,7 +183,8 @@ fn main() -> ! {
             )
             .void_unwrap();
 
-            let message = acurite_protocol::tx00606::generate(id, battery_mv > BATTERY_LOW_MV, temp);
+            let message =
+                acurite_protocol::tx00606::generate(id, battery_mv > BATTERY_LOW_MV, temp);
 
             for _ in 0..7 {
                 radio.transmit(message);
