@@ -43,6 +43,25 @@ const TMP102_CONFIG: tmp102::Config = tmp102::Config::OS
 
 const BATTERY_LOW_MV: u16 = 2000;
 
+const fn wdt_config(timeout: hal::wdt::Timeout) -> watchdog::Config {
+    watchdog::Config::new()
+        .enable()
+        .timeout(timeout)
+        .interrupt()
+}
+
+// Needs to be adjusted for each chip
+use hal::wdt::Timeout::*;
+const WDT_CONFIG_SEQ: [watchdog::Config; 7] = [
+    wdt_config(Ms8000), // 1048576
+    wdt_config(Ms8000), // 1048576
+    wdt_config(Ms8000), // 1048576
+    wdt_config(Ms4000), // 524288
+    wdt_config(Ms2000), // 262144
+    wdt_config(Ms1000), // 131072
+    wdt_config(Ms500),  // 65536
+]; // = 4128768 @ 133.22 kHz = 30.99 sec
+
 #[cfg(feature = "atmega328p")]
 avr_hal_generic::renamed_pins! {
     type Pin = Pin;
@@ -117,8 +136,6 @@ fn main() -> ! {
     power::disable_unused_hardware(&dp.CPU, &dp.AC);
 
     let mut watchdog = watchdog::Watchdog::new(dp.WDT, &dp.CPU.mcusr);
-    watchdog.start(hal::wdt::Timeout::Ms1000).unwrap();
-    watchdog.interrupt(true);
 
     // Custom ADC driver that allows the use of noise reduction mode
     let mut adc = adc::Adc::new(
@@ -162,6 +179,8 @@ fn main() -> ! {
     #[cfg(feature = "atmega328p")]
     ufmt::uwriteln!(&mut uart, "Booted").void_unwrap();
 
+    // Start first watchdog period. This also enables the interrupt.
+    watchdog.configure(WDT_CONFIG_SEQ[0]);
     loop {
         // Active low
         led.set_low();
@@ -203,17 +222,22 @@ fn main() -> ! {
 
         adc.enable(false);
         power::sleep_enable(&dp.CPU, power::SleepMode::PowerDown);
-        // 31x1sec wakeups
-        for _ in 0..31 {
+
+        // Watchdog has already been started, so just sleep
+        power::disable_bod_in_sleep(&dp.CPU);
+        avr_device::asm::sleep();
+
+        // Sleep for the rest of the periods
+        for config in &WDT_CONFIG_SEQ[1..] {
+            // This also re-enables the interrupt
+            watchdog.configure(*config);
+
             power::disable_bod_in_sleep(&dp.CPU);
             avr_device::asm::sleep();
-            // If WDE is set, WDIE is automatically cleared by hardware when a
-            // time-out occurs. This is useful for keeping the Watchdog Reset
-            // security while using the interrupt. After the WDIE bit is cleared,
-            // the next time-out will generate a reset. To avoid the Watchdog Reset,
-            // WDIE must be set after each interrupt.
-            watchdog.interrupt(true);
         }
+        // Restart watchdog immediately after waking to minimize lost cycles
+        watchdog.configure(WDT_CONFIG_SEQ[0]);
+
         power::sleep_disable(&dp.CPU);
         adc.enable(true);
     }
